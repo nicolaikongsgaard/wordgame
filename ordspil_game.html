@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ordspil</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .game-container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
+            width: 100%;
+            text-align: center;
+        }
+
+        h1 {
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .score {
+            font-size: 1.5em;
+            margin-bottom: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 10px;
+            border-radius: 10px;
+        }
+
+        .letters-container {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 20px;
+            border-radius: 15px;
+            margin: 20px 0;
+        }
+
+        .letters {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+            margin: 10px 0;
+        }
+
+        .letter {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 1.2em;
+            font-weight: bold;
+            min-width: 40px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            transition: transform 0.2s;
+        }
+
+        .letter:hover {
+            transform: scale(1.1);
+        }
+
+        .letter.used {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a52);
+            opacity: 0.6;
+        }
+
+        .input-section {
+            margin: 30px 0;
+        }
+
+        input[type="text"] {
+            padding: 15px;
+            font-size: 1.2em;
+            border: none;
+            border-radius: 10px;
+            width: 200px;
+            text-align: center;
+            text-transform: uppercase;
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+        }
+
+        button {
+            padding: 15px 30px;
+            font-size: 1.1em;
+            background: linear-gradient(45deg, #FF6B6B, #4ECDC4);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            margin: 10px;
+            transition: transform 0.2s;
+        }
+
+        button:hover {
+            transform: scale(1.05);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .message {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 10px;
+            font-weight: bold;
+            min-height: 20px;
+        }
+
+        .success {
+            background: rgba(76, 175, 80, 0.3);
+            border: 2px solid #4CAF50;
+        }
+
+        .error {
+            background: rgba(244, 67, 54, 0.3);
+            border: 2px solid #f44336;
+        }
+
+        .info {
+            background: rgba(33, 150, 243, 0.3);
+            border: 2px solid #2196F3;
+        }
+
+        .word-list {
+            margin-top: 20px;
+            text-align: left;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>🎯 Ordspil</h1>
+        
+        <div class="score">
+            Score: <span id="score">0</span>
+        </div>
+
+        <div class="letters-container">
+            <h3>Dine bogstaver:</h3>
+            <div class="letters" id="letters"></div>
+        </div>
+
+        <div class="input-section">
+            <input type="text" id="wordInput" placeholder="Indtast et ord..." maxlength="14">
+            <br>
+            <button onclick="submitWord()">Aflevér ord</button>
+            <button onclick="newGame()">Nyt spil</button>
+        </div>
+
+        <div class="message" id="message"></div>
+
+        <div class="controls">
+            <button onclick="shuffleLetters()">Bland bogstaver</button>
+            <button onclick="showRules()" style="background: linear-gradient(45deg, #9b59b6, #8e44ad);">Regler</button>
+        </div>
+
+        <div class="word-list">
+            <h4>Dine ord:</h4>
+            <div id="wordHistory"></div>
+        </div>
+    </div>
+
+    <script>
+        class LetterBag {
+            constructor() {
+                // Mere vokaler end konsonanter for lettere orddannelse
+                this.vowels = 'AEIOUÆØÅ';
+                this.consonants = 'BCDFGHJKLMNPQRSTVXZ';
+                this.letters = [];
+                this.fillLetters();
+            }
+
+            fillLetters() {
+                while (this.letters.length < 14) {
+                    // 40% chance for vokal, 60% for konsonant (mere balanceret)
+                    if (Math.random() < 0.4) {
+                        this.letters.push(this.vowels[Math.floor(Math.random() * this.vowels.length)]);
+                    } else {
+                        this.letters.push(this.consonants[Math.floor(Math.random() * this.consonants.length)]);
+                    }
+                }
+            }
+
+            removeUsedLetters(word) {
+                for (let char of word) {
+                    const index = this.letters.indexOf(char);
+                    if (index > -1) {
+                        this.letters.splice(index, 1);
+                    }
+                }
+                this.fillLetters();
+            }
+
+            isValidLetters(word) {
+                const tempLetters = [...this.letters];
+                for (let char of word) {
+                    const index = tempLetters.indexOf(char);
+                    if (index === -1) return false;
+                    tempLetters.splice(index, 1);
+                }
+                return true;
+            }
+
+            shuffle() {
+                for (let i = this.letters.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [this.letters[i], this.letters[j]] = [this.letters[j], this.letters[i]];
+                }
+            }
+        }
+
+        class Player {
+            constructor() {
+                this.score = 0;
+                this.wordsPlayed = [];
+            }
+
+            addScore(points) {
+                this.score += points;
+            }
+
+            addWord(word, points) {
+                this.wordsPlayed.push({ word, points });
+            }
+        }
+
+        class WordValidator {
+            constructor() {
+                // Meget større dansk ordbog
+                this.dictionary = new Set([
+                    // Grundlæggende ord
+                    'HUND', 'KAT', 'HUS', 'BIL', 'MAD', 'VEN', 'MOR', 'FAR', 'SØN', 'DAG',
+                    'NAT', 'SOL', 'MÅNE', 'VAND', 'ILD', 'LUFT', 'TRÆ', 'STEN', 'GULD', 'SØ',
+                    'HAV', 'BJERG', 'DAL', 'VEJ', 'STI', 'DØR', 'VINDUE', 'BORD', 'STOL', 'SENG',
+                    
+                    // Kropsdele
+                    'HOVED', 'ØJE', 'ØRE', 'NÆSE', 'MUND', 'TAND', 'HALS', 'ARM', 'HÅND', 'FINGER',
+                    'BEN', 'FOD', 'TÅ', 'RYGG', 'MAVE', 'HJERTE', 'HJERNE', 'BLOD', 'KNOGLE', 'HUD',
+                    
+                    // Mad og drikke
+                    'KAFFE', 'TE', 'BRØD', 'KAGE', 'ØL', 'VIN', 'MÆLK', 'SMØR', 'OST', 'ÆG',
+                    'KYLLING', 'KØD', 'GRØNT', 'FRUGT', 'ÆBLE', 'BANAN', 'APPELSIN', 'JORDBÆR',
+                    'KARTOFFEL', 'LØGE', 'GULERODE', 'TOMAT', 'SALAT', 'PASTA', 'RIS', 'FISK',
+                    'PØLSE', 'PIZZA', 'BURGER', 'SUPPE', 'SAUCE', 'SALT', 'PEBER', 'SUKKER',
+                    
+                    // Farver
+                    'RØD', 'BLÅ', 'GRØN', 'GUL', 'SORT', 'HVID', 'PINK', 'LILLA', 'ORANGE',
+                    'BRUN', 'GRÅ', 'BEIGE', 'TURKIS', 'CYAN',
+                    
+                    // Egenskaber
+                    'STOR', 'LILLE', 'HØJ', 'LAV', 'LANG', 'KORT', 'BRED', 'SMAL', 'TYK', 'TYND',
+                    'GLAD', 'TRIST', 'SUR', 'SØDE', 'SALT', 'BITTER', 'VARM', 'KOLD', 'VÅDE', 'TØR',
+                    'NY', 'GAMMEL', 'UNG', 'ÆLDRE', 'HURTIG', 'LANGSOM', 'STÆRK', 'SVAG', 'RIG', 'FATTIG',
+                    'SMART', 'DUM', 'PÆNE', 'GRIM', 'SUND', 'SYG', 'FRISK', 'TRÆT', 'LYKKELIG',
+                    
+                    // Uddannelse
+                    'SKOLE', 'LÆRER', 'ELEV', 'KLASSE', 'OPGAVE', 'PRØVE', 'KARAKTER', 'FERIE', 'ARBEJDE',
+                    'UNIVERSITET', 'STUDENT', 'BOG', 'PEN', 'PAPIR', 'COMPUTER', 'TELEFON', 'TABLET',
+                    
+                    // Penge og handel
+                    'PENGE', 'BANK', 'BUTIK', 'MARKED', 'KØBE', 'SÆLGE', 'BETALE', 'GRATIS', 'DYR', 'BILLIG',
+                    'PRIS', 'RABAT', 'TILBUD', 'REGNING', 'KVITTERING', 'KORT', 'KONTANT',
+                    
+                    // Familie
+                    'FAMILIE', 'BARN', 'BABY', 'BEDSTEMOR', 'BEDSTEFAR', 'ONKEL', 'TANTE', 'FÆTTER', 'KUSINE',
+                    'SØSTER', 'BROR', 'DATTER', 'NIECE', 'NEVØ', 'SVIGERMOR', 'SVIGERFAR',
+                    
+                    // Steder
+                    'HJEM', 'GADE', 'BY', 'LAND', 'VERDEN', 'HIMMEL', 'JORD', 'SAND', 'GRÆS', 'PARK',
+                    'ZOO', 'MUSEUM', 'TEATER', 'BIOGRAFEN', 'RESTAURANT', 'CAFÉ', 'HOTEL', 'STRAND', 'SKOV',
+                    'KIRKE', 'HOSPITAL', 'APOTEK', 'STATION', 'LUFTHAVN', 'BRIDGE', 'TUNNEL',
+                    
+                    // Begivenheder
+                    'FEST', 'FØDSELSDAG', 'BRYLLUP', 'GAVE', 'KÆRESTE', 'ÆGTEFÆLLE', 'KRAM', 'KYS', 'KÆRLIGHED',
+                    'MØDE', 'INTERVIEW', 'KONCERT', 'SHOW', 'PARADE', 'MARKED', 'MESSE',
+                    
+                    // Tid
+                    'TID', 'TIME', 'MINUT', 'SEKUND', 'UGE', 'MÅNED', 'ÅR', 'FORTID', 'NUTID', 'FREMTID',
+                    'MORGEN', 'MIDDAG', 'AFTEN', 'MANDAG', 'TIRSDAG', 'ONSDAG', 'TORSDAG', 'FREDAG', 'LØRDAG', 'SØNDAG',
+                    'JANUAR', 'FEBRUAR', 'MARTS', 'APRIL', 'MAJ', 'JUNI', 'JULI', 'AUGUST', 'SEPTEMBER', 'OKTOBER', 'NOVEMBER', 'DECEMBER',
+                    
+                    // Sport og fritid
+                    'SPORT', 'FODBOLD', 'TENNIS', 'SVØMNING', 'LØBE', 'GÅTURE', 'RIDNING', 'SEJLSPORT',
+                    'CYKLING', 'SKIING', 'HOCKEY', 'BASKETBALL', 'VOLLEYBALL', 'GOLF', 'BOWLING',
+                    'MUSIK', 'SANG', 'DANS', 'FILM', 'SPIL', 'BOLD', 'CYKEL', 'TOG', 'FLY', 'SKIB',
+                    
+                    // Vejr
+                    'VEJR', 'REGN', 'SNE', 'STORM', 'VIND', 'SKY', 'TORDEN', 'LYN', 'REGNBUE',
+                    'IS', 'FROST', 'SOMMER', 'VINTER', 'FORÅR', 'EFTERÅR', 'SOLSKIN', 'SKYGGE',
+                    
+                    // Følelser og adfærd
+                    'LEGE', 'MORE', 'SJOV', 'LATTER', 'SMIL', 'GLÆDE', 'LYKKE', 'FRED', 'HÅBE', 'DRØM',
+                    'FRYGT', 'ANGST', 'VREDE', 'SORG', 'STRESS', 'ROLIG', 'NERVØS', 'STOLT', 'JALOUX',
+                    
+                    // Dyr
+                    'FISK', 'FUGL', 'HEST', 'KO', 'GRIS', 'FAR', 'KANIN', 'MUS', 'ROTTE', 'SLANGE',
+                    'LØVE', 'TIGER', 'ELEFANT', 'ABER', 'ULVE', 'BJØRN', 'HJORT', 'RÅDYR',
+                    
+                    // Natur
+                    'BLOMST', 'ROSE', 'TULIPAN', 'SOLSIKKE', 'LILLE', 'BUSKE', 'BLADE', 'ROD', 'FRØE',
+                    'SKOV', 'MARK', 'ENG', 'HAVE', 'PLANTE', 'UKRUDT', 'FRUGT', 'BÆR', 'NØDDE',
+                    
+                    // Aktiviteter og verber
+                    'SPISE', 'DRIKKE', 'SOVE', 'VÅGEN', 'GÅ', 'LØBE', 'HOPPE', 'DANSE', 'SYNGE', 'TALE',
+                    'LYTTE', 'SE', 'LÆSE', 'SKRIVE', 'TEGNE', 'MALE', 'BYGGE', 'LAVE', 'REPARERE',
+                    'RENSE', 'VASKE', 'TØRRE', 'STRYGE', 'KOGE', 'BAGE', 'GRILLE', 'FRITERE',
+                    'ÅBNE', 'LUKKE', 'STARTE', 'STOPPE', 'VENTE', 'HJÆLPE', 'LÆRE', 'UNDERVISE',
+                    'ARBEJDE', 'HVILE', 'LEGE', 'ØVER', 'TRÆNER', 'KONKURRERE', 'VINDE', 'TABE',
+                    
+                    // Småord og hverdagsord
+                    'OG', 'ELLER', 'MEN', 'FORDI', 'HVIS', 'HVAD', 'HVOR', 'HVEM', 'HVORNÅR', 'HVORFOR',
+                    'JA', 'NEJ', 'MÅSKE', 'ALDRIG', 'ALTID', 'NOGLE', 'ALLE', 'INGEN', 'MANGE', 'FÅ',
+                    'HER', 'DER', 'OVER', 'UNDER', 'MELLEM', 'VED', 'SIDEN', 'FORAN', 'BAGVED',
+                    'IND', 'UD', 'OP', 'NED', 'TIL', 'FRA', 'MED', 'UDEN', 'FOR', 'EFTER',
+                    
+                    // Teknologi
+                    'INTERNET', 'EMAIL', 'WEBSITE', 'APP', 'SOFTWARE', 'PROGRAM', 'DATA', 'FILE',
+                    'SKÆRM', 'TASTATUR', 'MUS', 'PRINTER', 'SCANNER', 'ROUTER', 'MODEM',
+                    
+                    // Tøj og mode
+                    'TØJ', 'SKJORTE', 'BUKSER', 'KJOLE', 'NEDERDEL', 'JAKKE', 'FRAKKE', 'SKO',
+                    'STRØMPER', 'UNDERTØJ', 'HAT', 'KASKET', 'HANDSKER', 'HALSTØRKLÆDE',
+                    
+                    // Redskaber og værktøj
+                    'HAMMER', 'SAV', 'SKRUETRÆKKER', 'TANG', 'KNIV', 'SAKS', 'NÅLE', 'TRÅD',
+                    'LASSO', 'SPAND', 'KOST', 'KLUD', 'SÅBE', 'SHAMPOO', 'TANDPASTRA',
+                    
+                    // Forskellige
+                    'LYDE', 'MUSIK', 'RYTME', 'MELODI', 'HARMONI', 'INSTRUMENT', 'GUITAR', 'PIANO',
+                    'VIOLIN', 'DRUMS', 'MIKROFON', 'HØJTTALER', 'RADIO', 'TV', 'FJERNBETJENING',
+                    'BATTERI', 'STRØM', 'ELEKTRICITET', 'LYS', 'LAMPE', 'PÆRE', 'STIKKONTAKT',
+                    
+                    // Ord med Æ, Ø, Å
+                    'ÆRE', 'ÆRE', 'GRÆDE', 'VÆRE', 'KÆRE', 'LÆRE', 'HØRE', 'RØRE', 'TØRE', 'BØRE',
+                    'FØDT', 'KØBT', 'SOLGT', 'BYGGET', 'LAVET', 'ÅBEN', 'VÅGEN', 'SPØRGE', 'SVARE'
+                ]);
+                
+                // Backup ordbog til at tjekke almindelige danske ord
+                this.simpleWords = new Set([
+                    'ØVE', 'ØL', 'ÆG', 'IS', 'TO', 'TRE', 'FIRE', 'FEM', 'SEKS', 'SYV', 'OTTE', 'NI', 'TI',
+                    'EN', 'ET', 'DE', 'DEN', 'DET', 'DU', 'JEG', 'VI', 'I', 'HAN', 'HUN', 'MIN', 'DIN', 'SIN',
+                    'MIT', 'DIT', 'SIT', 'VOR', 'VÆR', 'HAR', 'ER', 'VAR', 'BLE', 'GIV', 'TAG', 'KOM', 'GIK'
+                ]);
+            }
+
+            isValidWord(word) {
+                const upperWord = word.toUpperCase();
+                return this.dictionary.has(upperWord) || this.simpleWords.has(upperWord);
+            }
+
+            getHint(availableLetters) {
+                const possibleWords = Array.from(this.dictionary).filter(word => {
+                    if (word.length > availableLetters.length) return false;
+                    const tempLetters = [...availableLetters];
+                    for (let char of word) {
+                        const index = tempLetters.indexOf(char);
+                        if (index === -1) return false;
+                        tempLetters.splice(index, 1);
+                    }
+                    return true;
+                });
+                
+                if (possibleWords.length > 0) {
+                    return possibleWords[Math.floor(Math.random() * possibleWords.length)];
+                }
+                return null;
+            }
+        }
+
+        // Game instances
+        let letterBag = new LetterBag();
+        let player = new Player();
+        let validator = new WordValidator();
+
+        function displayLetters() {
+            const lettersDiv = document.getElementById('letters');
+            lettersDiv.innerHTML = '';
+            
+            letterBag.letters.forEach((letter, index) => {
+                const letterDiv = document.createElement('div');
+                letterDiv.className = 'letter';
+                letterDiv.textContent = letter;
+                letterDiv.id = `letter-${index}`;
+                lettersDiv.appendChild(letterDiv);
+            });
+        }
+
+        function updateScore() {
+            document.getElementById('score').textContent = player.score;
+        }
+
+        function showMessage(text, type = 'info') {
+            const messageDiv = document.getElementById('message');
+            messageDiv.textContent = text;
+            messageDiv.className = `message ${type}`;
+        }
+
+        function updateWordHistory() {
+            const historyDiv = document.getElementById('wordHistory');
+            historyDiv.innerHTML = '';
+            
+            player.wordsPlayed.forEach(entry => {
+                const wordDiv = document.createElement('div');
+                wordDiv.innerHTML = `<strong>${entry.word}</strong> - ${entry.points} point`;
+                historyDiv.appendChild(wordDiv);
+            });
+        }
+
+        function submitWord() {
+            const input = document.getElementById('wordInput');
+            const word = input.value.toUpperCase().trim();
+            
+            if (word.length < 2) {
+                showMessage('Ordet skal være mindst 2 bogstaver langt!', 'error');
+                return;
+            }
+
+            if (!letterBag.isValidLetters(word)) {
+                showMessage('Du har ikke de nødvendige bogstaver!', 'error');
+                return;
+            }
+
+            // Ordbogstjek slået fra - kun bogstavtjek
+            // if (!validator.isValidWord(word)) {
+            //     showMessage('Dette ord findes ikke i ordbogen!', 'error');
+            //     return;
+            // }
+
+            if (player.wordsPlayed.some(entry => entry.word === word)) {
+                showMessage('Du har allerede brugt dette ord!', 'error');
+                return;
+            }
+
+            // Beregn point - længere ord giver bonus
+            let points = word.length;
+            if (word.length >= 6) points += 2;
+            if (word.length >= 8) points += 3;
+            
+            player.addScore(points);
+            player.addWord(word, points);
+            letterBag.removeUsedLetters(word);
+            
+            showMessage(`Flot! "${word}" gav dig ${points} point!`, 'success');
+            input.value = '';
+            
+            displayLetters();
+            updateScore();
+            updateWordHistory();
+        }
+
+        function shuffleLetters() {
+            letterBag.shuffle();
+            displayLetters();
+            showMessage('Bogstaverne er blevet blandet!', 'info');
+        }
+
+        function getHint() {
+            // Hint-funktion slået fra da ordbog ikke bruges
+            showMessage('Hint-funktionen er ikke tilgængelig uden ordbog.', 'info');
+        }
+
+        function newGame() {
+            if (confirm('Er du sikker på, du vil starte et nyt spil? Din nuværende score vil blive nulstillet.')) {
+                letterBag = new LetterBag();
+                player = new Player();
+                
+                displayLetters();
+                updateScore();
+                updateWordHistory();
+                showMessage('Nyt spil startet! Held og lykke!', 'success');
+                document.getElementById('wordInput').value = '';
+            }
+        }
+
+        function showRules() {
+            alert(`REGLER FOR ORDSPILLET:
+
+🎯 MÅL: Lav så mange gyldige danske ord som muligt
+
+📝 SÅDAN SPILLER DU:
+• Du får 14 tilfældige bogstaver
+• Dan ord ved at bruge de tilgængelige bogstaver
+• Ord skal være mindst 2 bogstaver lange
+• Du kan bruge ethvert ord du kan tænke på
+• Du kan kun bruge hvert ord én gang
+
+🏆 POINT:
+• 1 point per bogstav i ordet
+• +2 bonus for ord på 6+ bogstaver
+• +3 bonus for ord på 8+ bogstaver
+
+💡 TIPS:
+• Brug "Bland bogstaver" hvis du sidder fast
+• Prøv både korte og lange ord for mere variation
+• Tænk på almindelige danske ord
+• Du bestemmer selv om ordet er gyldigt!
+
+Held og lykke! 🍀`);
+        }
+
+        // Event listeners
+        document.getElementById('wordInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                submitWord();
+            }
+        });
+
+        // Initialize game
+        displayLetters();
+        updateScore();
+        showMessage('Velkommen til Ordspillet! Dan ord med de tilgængelige bogstaver.', 'success');
+    </script>
+</body>
+</html>
